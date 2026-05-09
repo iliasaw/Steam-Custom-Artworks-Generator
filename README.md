@@ -1,6 +1,6 @@
 # Steam Custom Artworks Generator
 
-![Preview](https://i.imgur.com/your-preview-image.png)
+![Preview](https://i.imgur.com/WvjTYmr.png)
 
 A pixel-perfect visual tool to generate consistent, professional library artworks for your Steam collection. It automates fetching data and images while giving you full control over positioning and batch exporting.
 
