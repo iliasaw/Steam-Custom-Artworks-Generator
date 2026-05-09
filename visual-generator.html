@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Artwork Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,700;0,900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg: #111214;
+            --surface: #18191d;
+            --surface2: #1e2024;
+            --border: rgba(255, 255, 255, 0.07);
+            --border-hover: rgba(255, 255, 255, 0.14);
+            --accent: #c8a96e;
+            --accent-dim: rgba(200, 169, 110, 0.12);
+            --danger: #c0392b;
+            --text: #e8e8e8;
+            --text-dim: #6b6f7a;
+            --template-bg: #CCC1A1;
+            --ink: #161616;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Be Vietnam Pro', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            padding: 32px;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 24px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            height: calc(100vh - 64px);
+            position: sticky;
+            top: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar h2 {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #batchList {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .batch-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-dim);
+        }
+
+        .batch-item span {
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+
+        .batch-item button {
+            padding: 3px 8px;
+            background: transparent;
+            border: 1px solid rgba(192, 57, 43, 0.4);
+            color: var(--danger);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .batch-item button:hover {
+            background: rgba(192, 57, 43, 0.1);
+        }
+
+        .sidebar-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ── Main content ── */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ── Toolbar / Controls ── */
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            padding: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .input-group label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 11px;
+            border-radius: 6px;
+            outline: none;
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--border-hover);
+        }
+
+        button {
+            background: var(--accent);
+            color: #111;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: opacity 0.15s;
+            letter-spacing: 0.02em;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button.secondary {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        button.secondary:hover {
+            border-color: var(--border-hover);
+        }
+
+        button.success {
+            background: var(--surface2);
+            color: var(--accent);
+            border: 1px solid rgba(200, 169, 110, 0.3);
+            font-weight: 700;
+        }
+
+        button.success:hover {
+            background: var(--accent-dim);
+        }
+
+        /* ── SGDB Gallery ── */
+        .sgdb-gallery {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sgdb-gallery h3 {
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .gallery-item {
+            aspect-ratio: 21 / 9;
+            border-radius: 6px;
+            cursor: pointer;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid var(--border);
+            transition: border-color 0.15s, transform 0.15s;
+        }
+
+        .gallery-item:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        /* ── Manual panel ── */
+        .manual-panel {
+            background: var(--accent-dim);
+            border: 1px solid rgba(200, 169, 110, 0.25);
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .manual-panel .panel-title {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .manual-panel .row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .manual-panel input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 7px 10px;
+            border-radius: 6px;
+            outline: none;
+            flex: 1;
+            font-size: 0.85rem;
+        }
+
+        .manual-panel button {
+            background: var(--accent);
+            color: #111;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        /* ── Preview cards ── */
+        .preview-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* ── Loader ── */
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #loader .loader-text {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+
+        #loaderStatus {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .artwork {
+            display: flex;
+            flex-direction: column;
+            padding: 42px;
+            background: var(--template-bg);
+            color: var(--ink);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .divider {
+            background: var(--ink);
+            height: 6px;
+            min-height: 6px;
+            width: 100%;
+            border-radius: 100px;
+            flex-shrink: 0;
+        }
+
+        /* Тень через обёртку — html2canvas корректно рендерит box-shadow на обёртке */
+        .bg-img-wrap {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .bg-img-wrap .shadow {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 100%;
+            height: 100%;
+            background: var(--ink);
+            border-radius: 32px;
+            z-index: 0;
+        }
+
+        .bg-img {
+            position: relative;
+            z-index: 1;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: 50% 50%;
+            border-radius: 32px;
+            cursor: move;
+        }
+
+        .game-name {
+            font-weight: 900;
+            line-height: 1.05;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .pub-line {
+            display: block;
+            width: 100%;
+            line-height: 1.2;
+        }
+
+        .game-pub {
+            display: inline-block;
+            vertical-align: bottom;
+            max-width: 520px;
+            /* Почти вся ширина обложки */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .bottom {
+            display: block;
+            width: 100%;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-top: auto;
+            position: relative;
+        }
+
+        .game-date {
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+        }
+
+        /* Grid — точное соответствие оригинальному шаблону */
+        #grid-render {
+            width: 600px;
+            height: 900px;
+            gap: 12px;
+            padding-bottom: 200px;
+        }
+
+        #grid-render .game-name {
+            font-size: 48px;
+            height: 122px;
+        }
+
+        #grid-render .bg-img-wrap {
+            width: 100%;
+            height: 470px;
+        }
+
+        #grid-render .bg-img-wrap .shadow {
+            border-radius: 32px;
+        }
+
+        #grid-render .bg-img {
+            width: 100%;
+            height: 100%;
+        }
+
+        #grid-render .bottom {
+            font-size: 28px;
+            min-height: 80px;
+        }
+
+        #grid-render .game-date {
+            bottom: 0;
+        }
+
+        /* Horizontal — точное соответствие оригинальному шаблону */
+        #p-render {
+            width: 920px;
+            height: 430px;
+            flex-direction: row;
+            gap: 24px;
+            padding-bottom: 80px;
+        }
+
+        #p-render .divider {
+            width: 6px;
+            min-width: 6px;
+            height: 258px;
+            border-radius: 100px;
+        }
+
+        #p-render .bg-img-wrap {
+            width: 258px;
+            height: 258px;
+            flex-shrink: 0;
+        }
+
+        #p-render .bg-img {
+            width: 258px;
+            height: 258px;
+        }
+
+        #p-render .text-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 258px;
+            width: 100%;
+        }
+
+        #p-render .game-name {
+            font-size: 48px;
+            height: 160px;
+        }
+
+        #p-render .bottom {
+            font-size: 24px;
+            height: 100px;
+        }
+
+        #p-render .game-date {
+            position: absolute;
+            right: 0;
+        }
+
+        /* Hero — точное соответствие оригинальному шаблону */
+        .hero-container {
+            width: 768px;
+            height: 248px;
+            overflow: hidden;
+            position: relative;
+            border-radius: 12px;
+        }
+
+        #hero-preview {
+            transform: scale(0.2);
+            transform-origin: top left;
+            width: 3840px;
+            height: 1240px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            flex-direction: row;
+            gap: 42px;
+            padding: 128px;
+            padding-bottom: 240px;
+        }
+
+        #hero-preview .bg-img-wrap {
+            width: 1080px;
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        #hero-preview .bg-img-wrap .shadow {
+            border-radius: 64px;
+            top: 20px;
+            left: 20px;
+        }
+
+        #hero-preview .bg-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 64px;
+        }
+
+        #hero-preview .divider {
+            width: 12px;
+            min-width: 12px;
+            height: 100%;
+            border-radius: 100px;
+        }
+
+        #hero-preview .text-side {
+            display: flex;
+            flex-direction: column;
+            gap: 168px;
+            height: 100%;
+            width: 100%;
+            padding: 48px 0;
+        }
+
+        #hero-preview .game-name {
+            font-size: 144px;
+            height: 558px;
+        }
+
+        #hero-preview .bottom {
+            font-size: 64px;
+        }
+
+        #hero-preview .game-date {
+            position: unset;
+        }
+
+        /* Full Hero */
+        #hero-full {
+            width: 3840px;
+            height: 1240px;
+            flex-direction: row;
+            gap: 42px;
+            padding: 128px;
+            padding-bottom: 240px;
+            position: absolute;
+            left: -9999px;
+        }
+
+        #hero-full .bg-img-wrap {
+            width: 1080px;
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        #hero-full .bg-img-wrap .shadow {
+            border-radius: 64px;
+            top: 20px;
+            left: 20px;
+        }
+
+        #hero-full .bg-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 64px;
+        }
+
+        #hero-full .divider {
+            width: 12px;
+            min-width: 12px;
+            height: 100%;
+            border-radius: 100px;
+        }
+
+        #hero-full .text-side {
+            display: flex;
+            flex-direction: column;
+            gap: 168px;
+            height: 100%;
+            width: 100%;
+            padding: 48px 0;
+        }
+
+        #hero-full .game-name {
+            font-size: 144px;
+            height: 558px;
+        }
+
+        #hero-full .bottom {
+            font-size: 64px;
+        }
+
+        #hero-full .game-date {
+            position: unset;
+        }
+
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        /* Панель ручного ввода */
+        .manual-panel {
+            background: rgba(255, 180, 0, 0.08);
+            border: 1px solid rgba(255, 180, 0, 0.3);
+            padding: 16px 24px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            width: 100%;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .manual-panel .panel-title {
+            font-size: 0.75rem;
+            color: #ffb400;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .manual-panel .row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .manual-panel input {
+            background: #252932;
+            border: 1px solid #3d414a;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+            flex: 1;
+            font-size: 0.9rem;
+        }
+
+        .manual-panel button {
+            background: #ffb400;
+            color: #000;
+            font-weight: 700;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-content">
+
+        <div class="controls">
+            <div class="input-group" style="flex-grow: 1;">
+                <label>AppID / Steam URL</label>
+                <input type="text" id="appId" placeholder="e.g. 41050">
+            </div>
+            <button onclick="fetchSteamData()">Load</button>
+            <div class="input-group">
+                <label>Custom image</label>
+                <input type="file" id="imageInput" accept="image/*" onchange="handleImage(this)" style="display:none">
+                <button class="secondary" onclick="document.getElementById('imageInput').click()">📁 File</button>
+            </div>
+            <button class="success" onclick="addToBatch()">+ Add to Queue</button>
+        </div>
+
+        <div class="sgdb-gallery" id="gallery">
+            <h3>Backgrounds from SteamGridDB</h3>
+            <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+
+        <!-- Manual input (for games without store page or 18+ restricted) -->
+        <div class="manual-panel" id="manualPanel">
+            <div class="panel-title">⚠️ Game data not found — enter manually</div>
+            <div class="row">
+                <input type="text" id="manualName" placeholder="Game title">
+                <input type="text" id="manualPub" placeholder="Publisher">
+                <input type="text" id="manualDate" placeholder="Release date (e.g. 1 Jan, 2020)">
+                <button onclick="applyManual()">Apply</button>
+            </div>
+        </div>
+
+        <div class="previews">
+            <div class="preview-card">
+                <div class="artwork" id="grid-render">
+                    <h1 class="game-name"></h1>
+                    <div class="divider"></div>
+                    <div class="bg-img-wrap">
+                        <div class="shadow"></div>
+                        <div class="bg-img" draggable="false"></div>
+                    </div>
+                    <div class="bottom">
+                        <p class="pub-line">An <b class="game-pub"></b><br>Production</p>
+                        <p class="game-date"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-card">
+                <div class="artwork" id="p-render">
+                    <div class="bg-img-wrap">
+                        <div class="shadow"></div>
+                        <div class="bg-img" draggable="false"></div>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="text-side">
+                        <h1 class="game-name"></h1>
+                        <div class="bottom">
+                            <p class="pub-line">An <b class="game-pub"></b><br>Production</p>
+                            <p class="game-date"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-card">
+                <div class="hero-container">
+                    <div class="artwork" id="hero-preview">
+                        <div class="bg-img-wrap">
+                            <div class="shadow"></div>
+                            <div class="bg-img" draggable="false"></div>
+                        </div>
+                        <div class="divider"></div>
+                        <div class="text-side">
+                            <h1 class="game-name"></h1>
+                            <div class="bottom">
+                                <p class="pub-line">An <b class="game-pub"></b><br>Production</p>
+                                <p class="game-date"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <h2>Export Queue</h2>
+        <div id="batchList"></div>
+        <div class="sidebar-actions">
+            <div class="input-group">
+                <label>Save folder</label>
+                <input type="text" id="customPath" placeholder="screenshots/grid">
+            </div>
+            <button class="secondary" onclick="exportZip()">Download ZIP</button>
+            <button class="success" onclick="saveToSteam()">Save to Folder</button>
+        </div>
+    </div>
+
+    <div class="artwork" id="hero-full">
+        <div class="bg-img-wrap">
+            <div class="shadow"></div>
+            <div class="bg-img" draggable="false"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="text-side">
+            <h1 class="game-name"></h1>
+            <div class="bottom">
+                <p class="pub-line">An <b class="game-pub"></b><br>Production</p>
+                <p class="game-date"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="loader">
+        <div id="loaderStatus">0%</div>
+        <div class="loader-text">Processing...</div>
+    </div>
+
+    <script>
+        let currentImage = '', globalPosX = 50, globalPosY = 50, batch = [];
+
+        // Обрезаем текст с многоточием через JS (html2canvas не поддерживает -webkit-line-clamp)
+        // Используем el.offsetHeight — браузер уже знает правильную высоту из CSS
+        function clampText(el) {
+            const fullText = el.dataset.fullText || el.innerText;
+            el.dataset.fullText = fullText;
+            el.innerText = fullText;
+            const maxH = el.offsetHeight;
+            if (!maxH || el.scrollHeight <= maxH + 2) return; // текст влезает
+            let lo = 0, hi = fullText.length;
+            while (lo < hi - 1) {
+                const mid = Math.floor((lo + hi) / 2);
+                el.innerText = fullText.slice(0, mid) + '...';
+                if (el.scrollHeight <= maxH + 2) lo = mid; else hi = mid;
+            }
+            el.innerText = fullText.slice(0, lo) + '...';
+        }
+
+        function applyClamp() {
+            document.querySelectorAll('#grid-render .game-name, #p-render .game-name, #hero-preview .game-name, #hero-full .game-name').forEach(el => clampText(el));
+        }
+
+        function setBackground(originalUrl) {
+            const proxyUrl = `/api/proxy-img?url=${encodeURIComponent(originalUrl)}`;
+            currentImage = proxyUrl;
+            document.querySelectorAll('.bg-img').forEach(el => el.style.backgroundImage = `url(${proxyUrl})`);
+        }
+
+        function handleImage(input) {
+            if (input.files?.[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    currentImage = e.target.result;
+                    document.querySelectorAll('.bg-img').forEach(el => el.style.backgroundImage = `url(${currentImage})`);
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        async function fetchSteamData() {
+            let input = document.getElementById('appId').value.trim();
+            let appId = input.match(/\/app\/(\d+)/)?.[1] || input;
+            document.getElementById('appId').value = appId;
+            if (!appId || isNaN(appId)) return;
+
+            const manualPanel = document.getElementById('manualPanel');
+            manualPanel.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/steam/${appId}`);
+                const json = await res.json();
+                const entry = json[appId];
+
+                // Данные есть и success: true
+                if (entry && entry.success && entry.data) {
+                    const data = entry.data;
+                    document.querySelectorAll('.game-name').forEach(el => { el.dataset.fullText = ''; el.innerText = data.name; });
+                    document.querySelectorAll('.game-pub').forEach(el => el.innerText = data.publishers?.[0] || '');
+                    document.querySelectorAll('.game-date').forEach(el => el.innerText = data.release_date?.date || '');
+                    setTimeout(applyClamp, 100);
+                    searchSGDB(appId);
+                    return;
+                }
+
+                // success: false или data: null — игра без страницы магазина, 18+, DLC и т.д.
+                showManualPanel(appId);
+            } catch (e) {
+                // Сетевая ошибка или невалидный JSON
+                showManualPanel(appId);
+            }
+        }
+
+        function showManualPanel(appId) {
+            const panel = document.getElementById('manualPanel');
+            panel.style.display = 'flex';
+            // Всё равно запускаем поиск картинок по AppID
+            searchSGDB(appId);
+        }
+
+        function applyManual() {
+            const name = document.getElementById('manualName').value.trim();
+            const pub = document.getElementById('manualPub').value.trim();
+            const date = document.getElementById('manualDate').value.trim();
+            if (!name) return alert('Please enter the game title');
+            document.querySelectorAll('.game-name').forEach(el => { el.dataset.fullText = ''; el.innerText = name; });
+            document.querySelectorAll('.game-pub').forEach(el => el.innerText = pub);
+            document.querySelectorAll('.game-date').forEach(el => el.innerText = date);
+            setTimeout(applyClamp, 100);
+        }
+
+        async function searchSGDB(appId) {
+            const gallery = document.getElementById('gallery'), grid = document.getElementById('galleryGrid');
+            gallery.style.display = 'flex'; grid.innerHTML = '<span style="color:#888;font-size:0.85rem">Loading...</span>';
+            try {
+                const res = await fetch(`/api/sgdb/search/${appId}`);
+                const json = await res.json();
+                if (json.success && json.data.length > 0) {
+                    // SGDB нашёл hero-картинки
+                    grid.innerHTML = json.data.map(h => {
+                        const thumbProxy = `/api/proxy-img?url=${encodeURIComponent(h.thumb)}`;
+                        return `<div class="gallery-item" style="background-image: url(${thumbProxy})" onclick="setBackground('${h.url}')"></div>`;
+                    }).join('');
+                } else {
+                    // SGDB пустой — показываем официальные ассеты из Steam
+                    showSteamFallback(appId, grid);
+                }
+            } catch (e) {
+                // Ошибка SGDB — показываем Steam-ассеты как запасной вариант
+                showSteamFallback(appId, grid);
+            }
+        }
+
+        function showSteamFallback(appId, grid) {
+            const steamAssets = [
+                { label: 'Steam Hero', url: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg` },
+                { label: 'Steam Header', url: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg` },
+                { label: 'Steam Capsule', url: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg` },
+            ];
+            grid.innerHTML = '<div style="grid-column:1/-1;color:#aaa;font-size:0.8rem;margin-bottom:4px">⚠️ No hero images found on SteamGridDB. Showing official Steam assets:</div>' +
+                steamAssets.map(a => {
+                    const proxy = `/api/proxy-img?url=${encodeURIComponent(a.url)}`;
+                    return `<div class="gallery-item steam-fallback" style="background-image: url(${proxy}); position:relative" onclick="setBackground('${a.url}')">
+                        <span style="position:absolute;bottom:4px;left:6px;font-size:0.65rem;background:rgba(0,0,0,0.6);color:#fff;padding:2px 6px;border-radius:4px">${a.label}</span>
+                    </div>`;
+                }).join('');
+        }
+
+        document.addEventListener('mousedown', e => {
+            if (!e.target.classList.contains('bg-img')) return;
+            e.preventDefault();
+            const startX = e.clientX, startY = e.clientY, sX = globalPosX, sY = globalPosY;
+            const onMove = ev => {
+                globalPosX = Math.max(0, Math.min(100, sX - (ev.clientX - startX) / 5));
+                globalPosY = Math.max(0, Math.min(100, sY - (ev.clientY - startY) / 5));
+                document.querySelectorAll('.bg-img').forEach(el => el.style.backgroundPosition = `${globalPosX}% ${globalPosY}%`);
+            };
+            const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+            window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+        });
+
+        document.addEventListener('dragstart', e => { if (e.target.classList.contains('bg-img')) e.preventDefault(); });
+        window.addEventListener('resize', applyClamp);
+
+        async function addToBatch() {
+            const appId = document.getElementById('appId').value;
+            const nameEl = document.querySelector('#grid-render .game-name');
+            const name = nameEl?.dataset.fullText || nameEl?.innerText;
+            if (!appId || !name) return alert('Load a game first!');
+            const loader = document.getElementById('loader'); loader.style.display = 'flex';
+            const captures = [{ id: 'grid-render', name: `${appId}p.png` }, { id: 'p-render', name: `${appId}.png` }, { id: 'hero-full', name: `${appId}_hero.png` }];
+            const item = { appId, name, files: [] };
+            for (const cap of captures) {
+                const canvas = await html2canvas(document.getElementById(cap.id), { scale: 3, backgroundColor: '#CCC1A1', useCORS: true });
+                item.files.push({ filename: cap.name, data: canvas.toDataURL('image/png') });
+            }
+            const logoCanvas = document.createElement('canvas'); logoCanvas.width = 1; logoCanvas.height = 1;
+            item.files.push({ filename: `${appId}_logo.png`, data: logoCanvas.toDataURL('image/png') });
+            batch.push(item); updateBatchUI(); loader.style.display = 'none';
+        }
+
+        function updateBatchUI() { document.getElementById('batchList').innerHTML = batch.map((item, i) => `<div class="batch-item"><span>${item.name}</span><button onclick="removeFromBatch(${i})">X</button></div>`).join(''); }
+        function removeFromBatch(i) { batch.splice(i, 1); updateBatchUI(); }
+
+        async function exportZip() {
+            if (batch.length === 0) return;
+            const zip = new JSZip();
+            batch.forEach(item => { item.files.forEach(f => zip.file(f.filename, f.data.split(',')[1], { base64: true })); });
+            const content = await zip.generateAsync({ type: 'blob' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = 'artworks.zip'; link.click();
+        }
+
+        async function saveToSteam() {
+            if (batch.length === 0) return;
+            const customPath = document.getElementById('customPath').value, loader = document.getElementById('loader');
+            loader.style.display = 'flex';
+            let total = batch.reduce((acc, item) => acc + item.files.length, 0), current = 0;
+            for (const item of batch) {
+                for (const file of item.files) {
+                    await fetch('/api/save', { method: 'POST', body: JSON.stringify({ filename: file.filename, image: file.data, customPath }) });
+                    current++; document.getElementById('loaderStatus').innerText = `${Math.round((current / total) * 100)}%`;
+                }
+            }
+            loader.style.display = 'none'; alert('Done!');
+        }
+    </script>
+</body>
+
+</html>
